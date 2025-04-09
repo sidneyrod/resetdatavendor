@@ -232,6 +232,6 @@ if uploaded_file:
                         break
 
         if image:
-            st.image(image, caption=image_caption)
+            st.image(image, caption=image_caption, width=500, use_container_width=False)
         else:
             st.info(f"No image found for program '{selected_program}'.")

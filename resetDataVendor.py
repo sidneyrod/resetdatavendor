@@ -4,14 +4,20 @@ import os
 from PIL import Image
 import base64
 from io import BytesIO
+import zipfile
+import tempfile
 
 # --- Configuração da página ---
 st.set_page_config(page_title="ReSet Dashboard", page_icon="kent_icon.ico", layout="wide")
+
+# --- Variável de imagem temporária global ---
+temp_img_dir = None
 
 # --- Sidebar Upload ---
 with st.sidebar:
     st.markdown("### 📁 Upload & Filters")
     uploaded_file = st.file_uploader("📄 Upload your .xlsm, .xlsx or .csv file", type=["xlsm", "xlsx", "csv"])
+    uploaded_zip = st.file_uploader("🖼️ Upload .zip file with images", type=["zip"])
     st.markdown("---")
     st.markdown(
         '''
@@ -33,6 +39,13 @@ with st.sidebar:
         ''',
         unsafe_allow_html=True
     )
+
+    # --- Extração do ZIP (se houver) ---
+    if uploaded_zip is not None:
+        temp_dir = tempfile.TemporaryDirectory()
+        with zipfile.ZipFile(uploaded_zip, "r") as zip_ref:
+            zip_ref.extractall(temp_dir.name)
+        temp_img_dir = temp_dir.name
 
 # --- Helpers ---
 def image_to_base64(path):
@@ -186,12 +199,10 @@ if uploaded_file:
             </div>
             """, unsafe_allow_html=True)
 
-            # Gera HTML das lojas
             cards = []
             for store in store_list:
                 cards.append(f"<div style='background-color: #333; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);'>{store}</div>")
-            
-            # Renderiza os cards
+
             stores_div = "<div style='display: flex; flex-wrap: wrap; gap: 10px;'>" + "".join(cards) + "</div>"
             st.markdown(stores_div, unsafe_allow_html=True)
 
@@ -199,14 +210,27 @@ if uploaded_file:
         st.markdown("### 🖼️ Bay Image")
         image = None
         image_caption = ""
-        image_dir = os.path.join(os.getcwd(), "images")
-        if os.path.exists(image_dir):
-            for file in os.listdir(image_dir):
+
+        # 1. Verifica se há imagens no zip temporário
+        if temp_img_dir and os.path.exists(temp_img_dir):
+            for file in os.listdir(temp_img_dir):
                 if file.lower().startswith(selected_program.lower()) and file.lower().endswith(('.jpg', '.png', '.jpeg')):
-                    image_path = os.path.join(image_dir, file)
+                    image_path = os.path.join(temp_img_dir, file)
                     image = Image.open(image_path)
                     image_caption = file
                     break
+
+        # 2. Se não encontrou no zip, tenta pasta local padrão
+        if image is None:
+            image_dir = os.path.join(os.getcwd(), "images")
+            if os.path.exists(image_dir):
+                for file in os.listdir(image_dir):
+                    if file.lower().startswith(selected_program.lower()) and file.lower().endswith(('.jpg', '.png', '.jpeg')):
+                        image_path = os.path.join(image_dir, file)
+                        image = Image.open(image_path)
+                        image_caption = file
+                        break
+
         if image:
             st.image(image, caption=image_caption)
         else:

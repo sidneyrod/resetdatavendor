@@ -65,6 +65,7 @@ st.markdown(f"""
 if uploaded_file:
     data_df, summary_df, reset_df = read_file(uploaded_file)
 
+    # --- Padronização ---
     if 'FinishTime' in data_df.columns:
         data_df['FinishTime'] = pd.to_datetime(data_df['FinishTime'], errors='coerce', dayfirst=True)
 
@@ -75,6 +76,7 @@ if uploaded_file:
     default_vendor = data_df['Vendor'].dropna().unique()[0]
     default_program = data_df[data_df['Vendor'] == default_vendor]['Program'].dropna().unique()[0]
 
+    # --- Filtros ---
     col1, col2 = st.columns([1, 1])
     with col1:
         st.markdown("### 🔎 Select a Vendor")
@@ -89,6 +91,7 @@ if uploaded_file:
         (data_df['Vendor'] == selected_vendor) & (data_df['Program'] == selected_program)
     ]
 
+    # --- Período Analisado ---
     if 'FinishTime' in filtered_df.columns:
         valid_dates_df = filtered_df[filtered_df['FinishTime'].notna()]
         if not valid_dates_df.empty:
@@ -102,15 +105,9 @@ if uploaded_file:
                 </div>
             """, unsafe_allow_html=True)
 
+    # --- KPIs ---
     num_stores = filtered_df['Store'].nunique() if 'Store' in filtered_df.columns else 0
-    if 'Bay' in filtered_df.columns:
-        num_bays = filtered_df['Bay'].nunique()
-    elif 'Location' in filtered_df.columns:
-        num_bays = filtered_df['Location'].nunique()
-    elif 'bay number' in filtered_df.columns:
-        num_bays = filtered_df['bay number'].nunique()
-    else:
-        num_bays = 0
+    num_bays = filtered_df['bay number'].nunique() if 'bay number' in filtered_df.columns else 0
     num_maint = len(filtered_df)
     avg_per_bay = round(num_maint / num_bays, 2) if num_bays else 0
     num_resets = len(reset_df[
@@ -118,83 +115,66 @@ if uploaded_file:
         (reset_df['Program'].str.upper().str.strip() == selected_program)
     ]) if not reset_df.empty else 0
 
-    # --- Layout final: KPIs + Imagem alinhados ---
-    left_col, right_col = st.columns([1.2, 1], gap="large")
+    # --- Estilo ---
+    st.markdown("""
+    <style>
+    .kpi-box {
+        background-color: #1E1E1E;
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+    .kpi-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: white;
+        margin-bottom: 10px;
+    }
+    .kpi-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-    with left_col:
-        st.markdown("<h3 style='margin-bottom: 20px;'>📊 Overview</h3>", unsafe_allow_html=True)
-
-        st.markdown("""
-        <style>
-        .kpi-box {
-            background-color: #1E1E1E;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 10px;
-            text-align: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-        }
-        .kpi-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: white;
-            margin-bottom: 5px;
-        }
-        .kpi-value {
-            font-size: 36px;
-            font-weight: bold;
-            color: white;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
+    # --- Layout ---
+    col_left, col_right = st.columns([1, 1])
+    with col_left:
+        st.markdown("### 📊 Overview")
         st.markdown(f"""
         <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'>
-            <div class='kpi-box'>
-                <div class='kpi-title'>🛠️ Maintenances</div>
-                <div class='kpi-value'>{num_maint}</div>
-            </div>
-            <div class='kpi-box'>
-                <div class='kpi-title'>🔁 Resets / Updates</div>
-                <div class='kpi-value'>{num_resets}</div>
-            </div>
-            <div class='kpi-box'>
-                <div class='kpi-title'>🏪 Stores</div>
-                <div class='kpi-value'>{num_stores}</div>
-            </div>
-            <div class='kpi-box'>
-                <div class='kpi-title'>📦 Bays</div>
-                <div class='kpi-value'>{num_bays}</div>
-            </div>
-            <div class='kpi-box' style='grid-column: span 2;'>
-                <div class='kpi-title'>📉 Avg. per Bay</div>
-                <div class='kpi-value'>{avg_per_bay}</div>
-            </div>
+            <div class='kpi-box'><div class='kpi-title'>🛠️ Maintenances</div><div class='kpi-value'>{num_maint}</div></div>
+            <div class='kpi-box'><div class='kpi-title'>🔁 Resets / Updates</div><div class='kpi-value'>{num_resets}</div></div>
+            <div class='kpi-box'><div class='kpi-title'>🏪 Stores</div><div class='kpi-value'>{num_stores}</div></div>
+            <div class='kpi-box'><div class='kpi-title'>📦 Bays</div><div class='kpi-value'>{num_bays}</div></div>
+            <div class='kpi-box' style='grid-column: span 2;'><div class='kpi-title'>📉 Avg. per Bay</div><div class='kpi-value'>{avg_per_bay}</div></div>
         </div>
         """, unsafe_allow_html=True)
 
-    with right_col:
-        st.markdown("<h3 style='margin-bottom: 20px;'>🖼️ Bay Image</h3>", unsafe_allow_html=True)
-
+    with col_right:
+        st.markdown("### 🖼️ Bay Image")
         image = None
         image_caption = ""
-        if os.path.exists("images"):
-            for file in os.listdir("images"):
-                if file.lower().startswith(selected_program.lower()) and file.lower().endswith((".jpg", ".png", ".jpeg")):
-                    image_path = os.path.join("images", file)
+        image_dir = os.path.join(os.getcwd(), "images")
+        if os.path.exists(image_dir):
+            for file in os.listdir(image_dir):
+                if file.lower().startswith(selected_program.lower()) and file.lower().endswith(('.jpg', '.png', '.jpeg')):
+                    image_path = os.path.join(image_dir, file)
                     image = Image.open(image_path)
                     image_caption = file
                     break
         if image:
-            st.image(image, caption=image_caption, use_container_width=True)
+            st.image(image, caption=image_caption)
         else:
             st.info(f"No image found for program '{selected_program}'.")
 
 else:
     st.markdown("""
-        <div style='display: flex; justify-content: center; align-items: center; margin-top: 30px; margin-bottom: 30px;'>
-            <div style='background-color: #0f2c3f; color: white; padding: 20px 30px; border-radius: 12px; font-size: 16px; font-weight: 500; box-shadow: 0 4px 10px rgba(0,0,0,0.3);'>
-                📄 Please upload a valid <strong>.xlsm</strong>, <strong>.xlsx</strong>, or <strong>.csv</strong> file in the sidebar to get started.
-            </div>
+    <div style='text-align: center; margin: 30px;'>
+        <div style='background-color: #0f2c3f; color: white; padding: 20px 30px; border-radius: 12px; font-size: 16px; font-weight: 500;'>
+            📄 Please upload a valid <strong>.xlsm</strong>, <strong>.xlsx</strong>, or <strong>.csv</strong> file in the sidebar to get started.
         </div>
+    </div>
     """, unsafe_allow_html=True)

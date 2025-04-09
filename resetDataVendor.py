@@ -2,14 +2,13 @@ import streamlit as st
 import pandas as pd
 import os
 from PIL import Image
-import plotly.express as px
 import base64
 from io import BytesIO
 
-# Page Config
+# --- Configuração da página ---
 st.set_page_config(page_title="ReSet Dashboard", page_icon="kent_icon.ico", layout="wide")
 
-# Sidebar
+# --- Sidebar Upload ---
 with st.sidebar:
     st.markdown("### 📁 Upload & Filters")
     uploaded_file = st.file_uploader("📄 Upload your .xlsm, .xlsx or .csv file", type=["xlsm", "xlsx", "csv"])
@@ -35,17 +34,12 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
-# Helpers
+# --- Helpers ---
 def image_to_base64(path):
     with open(path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode()
 
-def pil_image_to_base64(img):
-    buf = BytesIO()
-    img.save(buf, format="JPEG")
-    return base64.b64encode(buf.getvalue()).decode()
-
-@st.cache_data(show_spinner="📥 Reading file...")
+@st.cache_data(show_spinner="📅 Reading file...")
 def read_file(file):
     filename = file.name.lower()
     if filename.endswith(".csv"):
@@ -58,29 +52,16 @@ def read_file(file):
             pd.read_excel(xls, sheet_name="Reset_Update"),
         )
 
-# Header
+# --- Logo e título ---
 logo_base64 = image_to_base64("assets/logo_kent.jpeg")
-col1, col2, col3 = st.columns([1, 6, 1])
-with col2:
-    st.markdown(
-        f'''
-        <div style='
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            margin-bottom: 10px;
-            margin-top: 10px;
-        '>
-            <img src='data:image/jpeg;base64,{logo_base64}' width='80' style='border-radius: 10px;' />
-            <h1 style='color: #2E8B57; font-weight: 700; font-size: 2.4em; margin: 0;'>Reset Supported Programs</h1>
-        </div>
-        <hr style='border: 1px solid #2E8B57; margin-top: 10px; width: 100%;'>
-        ''',
-        unsafe_allow_html=True
-    )
+st.markdown(f"""
+<div style='text-align: center; margin-top: 10px;'>
+    <img src='data:image/jpeg;base64,{logo_base64}' width='80' style='border-radius: 10px;' />
+    <h1 style='color: #2E8B57; font-weight: 700; font-size: 2.5em; margin: 10px 0;'>Reset Supported Programs</h1>
+    <hr style='border: 1px solid #2E8B57; margin-top: 0px; width: 100%;'>
+</div>
+""", unsafe_allow_html=True)
 
-# Period analyzed - center aligned after header
 if uploaded_file:
     data_df, summary_df, reset_df = read_file(uploaded_file)
 
@@ -93,76 +74,36 @@ if uploaded_file:
 
     default_vendor = data_df['Vendor'].dropna().unique()[0]
     default_program = data_df[data_df['Vendor'] == default_vendor]['Program'].dropna().unique()[0]
-    filtered_temp = data_df[(data_df['Vendor'] == default_vendor) & (data_df['Program'] == default_program)]
 
-    if 'FinishTime' in filtered_temp.columns:
-        valid_dates_df = filtered_temp[filtered_temp['FinishTime'].notna()]
-        if not valid_dates_df.empty:
-            start_date = valid_dates_df['FinishTime'].min().date()
-            end_date = valid_dates_df['FinishTime'].max().date()
-            st.markdown(f"""
-                <div style='
-                    display: flex;
-                    justify-content: center;
-                    margin-bottom: 20px;
-                    margin-top: -10px;
-                '>
-                    <div style='
-                        width: 60%;
-                        text-align: center;
-                        font-size: 16px;
-                        font-weight: 500;
-                        color: white;
-                        background-color: #2e8b57;
-                        padding: 10px 18px;
-                        border-radius: 12px;
-                        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                    '>
-                        📅 Period analyzed: <strong>{start_date.strftime('%b %d, %Y')}</strong> to <strong>{end_date.strftime('%b %d, %Y')}</strong>
-                    </div>
-                </div>
-""", unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.markdown("### 🔎 Select a Vendor")
+        selected_vendor = st.selectbox("", sorted(data_df['Vendor'].dropna().unique()), key="vendor")
 
-    st.markdown("""
-        <style>
-            .label-style {
-                font-weight: 600;
-                color: white;
-                font-size: 15px;
-                margin-bottom: 4px;
-                display: block;
-            }
-            div[data-baseweb="select"] {
-                font-size: 15px;
-            }
-            .full-width-box > div {
-                width: 100% !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
-    col_v1, col_v2 = st.columns([1, 1])
-    with col_v1:
-        st.markdown("<span class='label-style'>🔎 Select a Vendor</span>", unsafe_allow_html=True)
-        selected_vendor = st.selectbox(
-            "", sorted(data_df['Vendor'].dropna().unique()),
-            key="vendor", label_visibility="collapsed"
-        )
-
-    with col_v2:
-        vendor_programs = sorted(data_df[data_df['Vendor'] == selected_vendor]['Program'].dropna().unique())
-        st.markdown("<span class='label-style'>🎯 Select a Program</span>", unsafe_allow_html=True)
-        selected_program = st.selectbox(
-            "", vendor_programs, key="program", label_visibility="collapsed"
-        )
+    with col2:
+        st.markdown("### 🎯 Select a Program")
+        programs = sorted(data_df[data_df['Vendor'] == selected_vendor]['Program'].dropna().unique())
+        selected_program = st.selectbox("", programs, key="program")
 
     filtered_df = data_df[
         (data_df['Vendor'] == selected_vendor) & (data_df['Program'] == selected_program)
     ]
 
-    # KPIs
+    if 'FinishTime' in filtered_df.columns:
+        valid_dates_df = filtered_df[filtered_df['FinishTime'].notna()]
+        if not valid_dates_df.empty:
+            start_date = valid_dates_df['FinishTime'].min().date()
+            end_date = valid_dates_df['FinishTime'].max().date()
+            st.markdown(f"""
+                <div style='display: flex; justify-content: center; margin-top: 10px; margin-bottom: 20px;'>
+                    <div style='background-color: #2E8B57; color: white; padding: 10px 20px; border-radius: 12px; font-size: 16px; font-weight: 500; box-shadow: 0 4px 10px rgba(0,0,0,0.3);'>
+                        🗓️ Period analyzed: <strong>{start_date.strftime('%b %d, %Y')}</strong> to <strong>{end_date.strftime('%b %d, %Y')}</strong>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
     num_stores = filtered_df['Store'].nunique() if 'Store' in filtered_df.columns else 0
-    if 'Bay' in filtered_df.columns and filtered_df['Bay'].notna().sum() > 0:
+    if 'Bay' in filtered_df.columns:
         num_bays = filtered_df['Bay'].nunique()
     elif 'Location' in filtered_df.columns:
         num_bays = filtered_df['Location'].nunique()
@@ -171,107 +112,88 @@ if uploaded_file:
     else:
         num_bays = 0
     num_maint = len(filtered_df)
-    avg_maint_per_bay = round(num_maint / num_bays, 2) if num_bays else 0
+    avg_per_bay = round(num_maint / num_bays, 2) if num_bays else 0
     num_resets = len(reset_df[
         (reset_df['Vendor'].str.upper().str.strip() == selected_vendor) &
         (reset_df['Program'].str.upper().str.strip() == selected_program)
     ]) if not reset_df.empty else 0
 
-    st.markdown("### 📊 Overview")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("🏪 Stores", num_stores)
-    col2.metric("📦 Bays", num_bays)
-    col3.metric("🛠️ Maintenances", num_maint)
-    col4.metric("📉 Avg. per Bay", avg_maint_per_bay)
-    col5.metric("🔁 Resets / Updates", num_resets)
+    # --- Layout final: KPIs + Imagem alinhados ---
+    left_col, right_col = st.columns([1.2, 1], gap="large")
 
-    # Image
-    st.markdown("---")
-    st.markdown("### 🖼️ Bay Image")
-    image = None
-    image_caption = ""
-    if os.path.exists("images"):
-        for file in os.listdir("images"):
-            if file.lower().startswith(selected_program.lower()) and file.lower().endswith((".jpg", ".png", ".jpeg")):
-                image_path = os.path.join("images", file)
-                image = Image.open(image_path)
-                image_caption = f"{file}"
-                break
+    with left_col:
+        st.markdown("<h3 style='margin-bottom: 20px;'>📊 Overview</h3>", unsafe_allow_html=True)
 
-    if image:
-        encoded_img = pil_image_to_base64(image)
-        st.markdown(f"""
-            <style>
-                .zoom-img {{
-                    max-height: 80vh;
-                    max-width: 100%;
-                    width: auto;
-                    border-radius: 15px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-                    transition: transform 0.3s ease;
-                    cursor: zoom-in;
-                }}
-                .zoom-img:hover {{
-                    transform: scale(1.03);
-                }}
-                .modal {{
-                    display: none;
-                    position: fixed;
-                    z-index: 9999;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                    height: 100%;
-                    overflow: auto;
-                    background-color: rgba(0,0,0,0.9);
-                }}
-                .modal-content {{
-                    display: block;
-                    margin: 5% auto;
-                    max-width: 90%;
-                    max-height: 90vh;
-                    border-radius: 15px;
-                }}
-                .close {{
-                    position: absolute;
-                    top: 20px;
-                    right: 35px;
-                    color: #fff;
-                    font-size: 40px;
-                    font-weight: bold;
-                    cursor: pointer;
-                }}
-            </style>
-            <div style='text-align: center;'>
-                <img src='data:image/jpeg;base64,{encoded_img}' class='zoom-img' onclick="document.getElementById('imgModal').style.display='block'" title='{image_caption}' />
-            </div>
-            <div id='imgModal' class='modal' onclick="this.style.display='none'">
-                <span class='close' onclick="document.getElementById('imgModal').style.display='none'">&times;</span>
-                <img class='modal-content' src='data:image/jpeg;base64,{encoded_img}' />
-            </div>
+        st.markdown("""
+        <style>
+        .kpi-box {
+            background-color: #1E1E1E;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 10px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+        .kpi-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 5px;
+        }
+        .kpi-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: white;
+        }
+        </style>
         """, unsafe_allow_html=True)
-        st.caption(image_caption)
-    else:
-        st.info(f"No image found for program '{selected_program}'.")
+
+        st.markdown(f"""
+        <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'>
+            <div class='kpi-box'>
+                <div class='kpi-title'>🛠️ Maintenances</div>
+                <div class='kpi-value'>{num_maint}</div>
+            </div>
+            <div class='kpi-box'>
+                <div class='kpi-title'>🔁 Resets / Updates</div>
+                <div class='kpi-value'>{num_resets}</div>
+            </div>
+            <div class='kpi-box'>
+                <div class='kpi-title'>🏪 Stores</div>
+                <div class='kpi-value'>{num_stores}</div>
+            </div>
+            <div class='kpi-box'>
+                <div class='kpi-title'>📦 Bays</div>
+                <div class='kpi-value'>{num_bays}</div>
+            </div>
+            <div class='kpi-box' style='grid-column: span 2;'>
+                <div class='kpi-title'>📉 Avg. per Bay</div>
+                <div class='kpi-value'>{avg_per_bay}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with right_col:
+        st.markdown("<h3 style='margin-bottom: 20px;'>🖼️ Bay Image</h3>", unsafe_allow_html=True)
+
+        image = None
+        image_caption = ""
+        if os.path.exists("images"):
+            for file in os.listdir("images"):
+                if file.lower().startswith(selected_program.lower()) and file.lower().endswith((".jpg", ".png", ".jpeg")):
+                    image_path = os.path.join("images", file)
+                    image = Image.open(image_path)
+                    image_caption = file
+                    break
+        if image:
+            st.image(image, caption=image_caption, use_container_width=True)
+        else:
+            st.info(f"No image found for program '{selected_program}'.")
 
 else:
     st.markdown("""
-        <div style='
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 30px;
-            margin-bottom: 30px;
-        '>
-            <div style='
-                background-color: #0f2c3f;
-                color: white;
-                padding: 20px 30px;
-                border-radius: 12px;
-                font-size: 16px;
-                font-weight: 500;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            '>
+        <div style='display: flex; justify-content: center; align-items: center; margin-top: 30px; margin-bottom: 30px;'>
+            <div style='background-color: #0f2c3f; color: white; padding: 20px 30px; border-radius: 12px; font-size: 16px; font-weight: 500; box-shadow: 0 4px 10px rgba(0,0,0,0.3);'>
                 📄 Please upload a valid <strong>.xlsm</strong>, <strong>.xlsx</strong>, or <strong>.csv</strong> file in the sidebar to get started.
             </div>
         </div>

@@ -10,6 +10,13 @@ import tempfile
 # --- Configuração da página ---
 st.set_page_config(page_title="ReSet Dashboard", page_icon="kent_icon.ico", layout="wide")
 
+st.markdown("""
+    <style>
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
 # --- Variável de imagem temporária global ---
 temp_img_dir = None
 

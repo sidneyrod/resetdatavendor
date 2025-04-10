@@ -232,6 +232,15 @@ if uploaded_file:
                         break
 
         if image:
-            st.image(image, caption=image_caption, width=500, use_container_width=False)
+            buffered = BytesIO()
+            image.save(buffered, format="PNG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode()
+
+            st.markdown(f"""
+            <div style='text-align: center;'>
+                <img src='data:image/png;base64,{img_base64}' style='max-height: 430px; width: auto; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);'/>
+                <div style='color: #ccc; font-size: 14px; margin-top: 8px;'>{image_caption}</div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             st.info(f"No image found for program '{selected_program}'.")

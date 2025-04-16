@@ -7,9 +7,10 @@ from io import BytesIO
 import zipfile
 import tempfile
 
-# --- Configuração da página ---
+# set page config
 st.set_page_config(page_title="ReSet Dashboard", page_icon="kent_icon.ico", layout="wide")
 
+# hide Streamlit default header and footer
 st.markdown("""
     <style>
         header {visibility: hidden;}
@@ -17,14 +18,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Variável de imagem temporária global ---
-temp_img_dir = None
+# global temp image directories list
+temp_img_dirs = []
 
-# --- Sidebar Upload ---
+# sidebar for file uploads
 with st.sidebar:
     st.markdown("### 📁 Upload & Filters")
     uploaded_file = st.file_uploader("📄 Upload your .xlsm, .xlsx or .csv file", type=["xlsm", "xlsx", "csv"])
-    uploaded_zip = st.file_uploader("🖼️ Upload .zip file with images", type=["zip"])
+
+    uploaded_zips = st.file_uploader("🖼️ Upload .zip file(s) with images", type=["zip"], accept_multiple_files=True)
     st.markdown("---")
     st.markdown(
         '''
@@ -47,20 +49,24 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
-    # --- Extração do ZIP (se houver) ---
-    if uploaded_zip is not None:
-        temp_dir = tempfile.TemporaryDirectory()
-        with zipfile.ZipFile(uploaded_zip, "r") as zip_ref:
-            zip_ref.extractall(temp_dir.name)
-        temp_img_dir = temp_dir.name
+    # extract zip files if any
+    if uploaded_zips:
+        for uploaded_zip in uploaded_zips:
+            temp_dir = tempfile.TemporaryDirectory()
+            with zipfile.ZipFile(uploaded_zip, "r") as zip_ref:
+                zip_ref.extractall(temp_dir.name)
+            temp_img_dirs.append(temp_dir.name)
 
-# --- Helpers ---
+# convert image to base64
 def image_to_base64(path):
+    # convert image file to base64 string
     with open(path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode()
 
+# load Excel or CSV
 @st.cache_data(show_spinner="🗓️ Reading file...")
 def read_file(file):
+    # read data file
     filename = file.name.lower()
     if filename.endswith(".csv"):
         return pd.read_csv(file), pd.DataFrame(), pd.DataFrame()
@@ -72,7 +78,7 @@ def read_file(file):
             pd.read_excel(xls, sheet_name="Reset_Update"),
         )
 
-# --- Logo e título ---
+# render logo and title
 logo_base64 = ""
 if os.path.exists("assets/logo_kent.jpeg"):
     logo_base64 = image_to_base64("assets/logo_kent.jpeg")
@@ -85,9 +91,12 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# if file uploaded
 if uploaded_file:
+    # load Excel data
     data_df, summary_df, reset_df = read_file(uploaded_file)
 
+    # clean and normalize columns
     if 'FinishTime' in data_df.columns:
         data_df['FinishTime'] = pd.to_datetime(data_df['FinishTime'], errors='coerce', dayfirst=True)
 
@@ -98,7 +107,7 @@ if uploaded_file:
     default_vendor = data_df['Vendor'].dropna().unique()[0]
     default_program = data_df[data_df['Vendor'] == default_vendor]['Program'].dropna().unique()[0]
 
-    # --- Filtros ---
+    # dropdown filters
     st.markdown("""
         <style>
             .label-style {
@@ -120,23 +129,17 @@ if uploaded_file:
     col_v1, col_v2 = st.columns([1, 1])
     with col_v1:
         st.markdown("<span class='label-style'>🔎 Select a Vendor</span>", unsafe_allow_html=True)
-        selected_vendor = st.selectbox(
-            "", sorted(data_df['Vendor'].dropna().unique()),
-            key="vendor", label_visibility="collapsed"
-        )
+        selected_vendor = st.selectbox("", sorted(data_df['Vendor'].dropna().unique()), key="vendor")
 
     with col_v2:
         vendor_programs = sorted(data_df[data_df['Vendor'] == selected_vendor]['Program'].dropna().unique())
         st.markdown("<span class='label-style'>🎯 Select a Program</span>", unsafe_allow_html=True)
-        selected_program = st.selectbox(
-            "", vendor_programs, key="program", label_visibility="collapsed"
-        )
+        selected_program = st.selectbox("", vendor_programs, key="program")
 
-    filtered_df = data_df[
-        (data_df['Vendor'] == selected_vendor) & (data_df['Program'] == selected_program)
-    ]
+    # filter data
+    filtered_df = data_df[(data_df['Vendor'] == selected_vendor) & (data_df['Program'] == selected_program)]
 
-    # --- Período Analisado ---
+    # show date period
     valid_dates_df = filtered_df[filtered_df['FinishTime'].notna()]
     if not valid_dates_df.empty:
         start_date = valid_dates_df['FinishTime'].min().date()
@@ -149,7 +152,7 @@ if uploaded_file:
         </div>
         """, unsafe_allow_html=True)
 
-    # --- KPIs ---
+    # calculate KPIs
     num_stores = filtered_df['Store'].nunique()
     num_bays = filtered_df['bay number'].nunique()
     num_maint = len(filtered_df)
@@ -159,10 +162,11 @@ if uploaded_file:
         (reset_df['Program'].str.upper().str.strip() == selected_program)
     ]) if not reset_df.empty else 0
 
-    # --- Layout Principal ---
+    # main layout
     col_left, col_right = st.columns([1, 1], gap="medium")
 
     with col_left:
+        # render KPIs
         st.markdown("### 📊 Overview")
         st.markdown("""
         <style>
@@ -197,7 +201,7 @@ if uploaded_file:
         </div>
         """, unsafe_allow_html=True)
 
-        # --- Lista das Lojas ---
+        # render store list
         store_list = sorted(filtered_df['Store'].unique())
         if store_list:
             st.markdown("""
@@ -209,25 +213,27 @@ if uploaded_file:
             cards = []
             for store in store_list:
                 cards.append(f"<div style='background-color: #333; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);'>{store}</div>")
-
             stores_div = "<div style='display: flex; flex-wrap: wrap; gap: 10px;'>" + "".join(cards) + "</div>"
             st.markdown(stores_div, unsafe_allow_html=True)
 
     with col_right:
+        # render program image
         st.markdown("### 🖼️ Bay Image")
         image = None
         image_caption = ""
 
-        # 1. Verifica se há imagens no zip temporário
-        if temp_img_dir and os.path.exists(temp_img_dir):
-            for file in os.listdir(temp_img_dir):
+        # try all zip folders
+        for zip_dir in temp_img_dirs:
+            for file in os.listdir(zip_dir):
                 if file.lower().startswith(selected_program.lower()) and file.lower().endswith(('.jpg', '.png', '.jpeg')):
-                    image_path = os.path.join(temp_img_dir, file)
+                    image_path = os.path.join(zip_dir, file)
                     image = Image.open(image_path)
                     image_caption = file
                     break
+            if image:
+                break
 
-        # 2. Se não encontrou no zip, tenta pasta local padrão
+        # if not found, check local image folder
         if image is None:
             image_dir = os.path.join(os.getcwd(), "images")
             if os.path.exists(image_dir):

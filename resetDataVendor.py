@@ -85,7 +85,7 @@ if os.path.exists("assets/logo_kent.jpeg"):
 
 st.markdown(f"""
 <div style='text-align: center; margin: 0; padding: 0;'>
-    <img src='data:image/jpeg;base64,{logo_base64}' width='200' style='border-radius: 10px; margin-bottom: 40px;' />
+    <img src='data:image/jpeg;base64,{logo_base64}' width='200' style='border-radius: 10px; margin-bottom: 15px;' />
     <h1 style='color: #2E8B57; font-weight: 700; font-size: 2.5em; margin: 0;'>Reset Supported Programs</h1>
     <hr style='border: 1px solid #2E8B57; margin: 6px auto 0 auto; width: 100%;'>
 </div>
@@ -129,15 +129,21 @@ if uploaded_file:
     col_v1, col_v2 = st.columns([1, 1])
     with col_v1:
         st.markdown("<span class='label-style'>🔎 Select a Vendor</span>", unsafe_allow_html=True)
-        selected_vendor = st.selectbox("", sorted(data_df['Vendor'].dropna().unique()), key="vendor")
+        selected_vendor = st.selectbox(
+            "", sorted(data_df['Vendor'].dropna().unique()),
+            key="vendor", label_visibility="collapsed"
+        )
 
     with col_v2:
         vendor_programs = sorted(data_df[data_df['Vendor'] == selected_vendor]['Program'].dropna().unique())
         st.markdown("<span class='label-style'>🎯 Select a Program</span>", unsafe_allow_html=True)
-        selected_program = st.selectbox("", vendor_programs, key="program")
+        selected_program = st.selectbox(
+            "", vendor_programs, key="program", label_visibility="collapsed"
+        )
 
-    # filter data
-    filtered_df = data_df[(data_df['Vendor'] == selected_vendor) & (data_df['Program'] == selected_program)]
+    filtered_df = data_df[
+        (data_df['Vendor'] == selected_vendor) & (data_df['Program'] == selected_program)
+    ]
 
     # show date period
     valid_dates_df = filtered_df[filtered_df['FinishTime'].notna()]
